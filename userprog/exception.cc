@@ -573,37 +573,89 @@ void handle_SC_Receive(){
     return move_program_counter();
 }
 
-void handle_SC_Exec() {
-    int virtAddr = kernel->machine->ReadRegister(4);  // doc dia chi ten chuong trinh tu thanh ghi r4
-    char* name = User2System(virtAddr, MaxFileLength + 1);
+void handle_SC_Exec(){
+    int virtAddr = kernel->machine->ReadRegister(4);  
+    char* name = User2System(virtAddr, MAX_LENGTH_STRING+1);
     if (name == NULL) {
-        cout<<"- Not enough memory in system\n";
+        DEBUG(dbgSys, "\n Not enough memory in System");
         ASSERT(false);
         kernel->machine->WriteRegister(2, -1);
         return move_program_counter();
     }
-    //kiểm tra có tồn tại file với name như trên không
-    OpenFile* file = kernel->fileSystem->Open(name);
-    if (file == NULL) {
-        cout<<"- Cannot open this file\n";
+
+    OpenFile* oFile = kernel->fileSystem->Open(name);
+    if (oFile == NULL) {
+        DEBUG(dbgSys, "\nExec:: Can't open this file.");
         kernel->machine->WriteRegister(2, -1);
         return move_program_counter();
     }
-    delete file;
-    file = NULL;
-    cout<<"- Check\n";
-    //thực thi việc chạy chương trình mới
+    delete oFile;
+
     kernel->machine->WriteRegister(2, kernel->pTab->ExecUpdate(name));
-    cout<<"- Check\n";
-    //delete []name;
+    
     return move_program_counter();
 }
 
-void handle_SC_Join() {
+void handle_SC_Join(){
     int id = kernel->machine->ReadRegister(4);
     kernel->machine->WriteRegister(2, kernel->pTab->JoinUpdate(id));
-			
-	return move_program_counter();
+    
+    return move_program_counter();
+}
+
+void handle_SC_Exit(){
+    int exitcode = kernel->machine->ReadRegister(4);
+    kernel->pTab->ExitUpdate(exitcode);
+    kernel->machine->WriteRegister(2, 0);
+
+    return move_program_counter();
+}
+
+void handle_SC_CreateSemaphore(){
+    int virtAddr = kernel->machine->ReadRegister(4);  
+    char* name = User2System(virtAddr, MAX_LENGTH_STRING+1);
+    if (name == NULL) {
+        DEBUG(dbgSys, "\n Not enough memory in System");
+        ASSERT(false);
+        kernel->machine->WriteRegister(2, -1);
+        return move_program_counter();
+    }
+    int semValue = kernel->machine->ReadRegister(5);
+
+    kernel->machine->WriteRegister(2, kernel->semTab->Create(name,semValue));
+    delete [] name;
+
+    return move_program_counter();
+}
+
+void handle_SC_Wait(){
+    int virtAddr = kernel->machine->ReadRegister(4);  
+    char* name = User2System(virtAddr, MAX_LENGTH_STRING+1);
+    if (name == NULL) {
+        DEBUG(dbgSys, "\n Not enough memory in System");
+        ASSERT(false);
+        kernel->machine->WriteRegister(2, -1);
+        return move_program_counter();
+    }
+    kernel->machine->WriteRegister(2, kernel->semTab->Wait(name));
+    delete []name;
+
+    return move_program_counter();
+}
+
+void handle_SC_Signal(){
+    int virtAddr = kernel->machine->ReadRegister(4);  
+    char* name = User2System(virtAddr, MAX_LENGTH_STRING+1);
+    if (name == NULL) {
+        DEBUG(dbgSys, "\n Not enough memory in System");
+        ASSERT(false);
+        kernel->machine->WriteRegister(2, -1);
+        return move_program_counter();
+    }
+    kernel->machine->WriteRegister(2, kernel->semTab->Signal(name));
+    delete []name;
+
+    return move_program_counter();
 }
 
 /* 
@@ -619,58 +671,58 @@ void ExceptionHandler(ExceptionType which)
         case NoException:
         {
             kernel->interrupt->setStatus(SystemMode);
-            DEBUG('a', "\n Switch to system mode.");
+            DEBUG('a', "\n Switch to system mode\n");
             break;
         }
         case PageFaultException:
         {
-            DEBUG('a', "\n No valid translation found.");
-            printf("\n\n No valid translation found.");
+            DEBUG('a', "\n No valid translation found\n");
+            printf("\n\n No valid translation found\n");
             kernel->interrupt->Halt();
             break;
         }
         case ReadOnlyException: {
-            DEBUG('a', "\n Write attempted to page marked read-only");
-            printf("\n\n Write attempted to page marked read-only");
+            DEBUG('a', "\n Write attempted to page marked read-only\n");
+            printf("\n\n Write attempted to page marked read-only\n");
             kernel->interrupt->Halt();
             break;
         }
 
         case BusErrorException: {
-            DEBUG('a', "\n Translation resulted invalid physical address");
-            printf("\n\n Translation resulted invalid physical address");
+            DEBUG('a', "\n Translation resulted invalid physical address\n");
+            printf("\n\n Translation resulted invalid physical address\n");
             kernel->interrupt->Halt();
             break;
         }
 
         case AddressErrorException: {
-            DEBUG('a', "\n Unaligned reference or one that was beyond the end of the address space");
-            printf("\n\n Unaligned reference or one that was beyond the end of the address space");
+            DEBUG('a', "\n Unaligned reference or one that was beyond the end of the address space\n");
+            printf("\n\n Unaligned reference or one that was beyond the end of the address space\n");
             kernel->interrupt->Halt();
             break;
         }
 
         case OverflowException: {
-            DEBUG('a', "\nInteger overflow in add or sub.");
-            printf("\n\n Integer overflow in add or sub.");
+            DEBUG('a', "\nInteger overflow in add or sub\n");
+            printf("\n\n Integer overflow in add or sub\n");
             kernel->interrupt->Halt();
             break;
         }
 
         case IllegalInstrException: {
-            DEBUG('a', "\n Unimplemented or reserved instr.");
-            printf("\n\n Unimplemented or reserved instr.");
+            DEBUG('a', "\n Unimplemented or reserved instr\n");
+            printf("\n\n Unimplemented or reserved instr\n");
             kernel->interrupt->Halt();
             break;
         }
 
         case NumExceptionTypes: {
-            DEBUG('a', "\n Number exception types");
-            printf("\n\n Number exception types");
+            DEBUG('a', "\n Number exception types\n");
+            printf("\n\n Number exception types\n");
             kernel->interrupt->Halt();
             break;
         }
-		case SyscallException: {
+		case SyscallException:
 			switch(type) {
 				case SC_Add:
                     return handle_SC_Add();
@@ -716,12 +768,19 @@ void ExceptionHandler(ExceptionType which)
                     return handle_SC_Exec();
                 case SC_Join:
                     return handle_SC_Join();
+                case SC_Exit:
+                    return handle_SC_Exit();
+                case SC_CreateSemaphore:
+                    return handle_SC_CreateSemaphore();
+                case SC_Wait:
+                    return handle_SC_Wait();
+                case SC_Signal:
+                    return handle_SC_Signal();
 				default:
                     cerr << "Unexpected system call " << type << "\n";
                     break;
 			}
 			break;
-        }
 		default:
 			cerr << "Unexpected user mode exception " << (int)which << "\n";
 		    break;

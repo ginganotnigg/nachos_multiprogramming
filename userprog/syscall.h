@@ -211,6 +211,10 @@ int Connect(int socketID, char* ip,int port);
 int Send(int socketID, char *buffer, int len);
 int Receive(int socketID, char *buffer, int len);
 
+int CreateSemaphore(char* name, int semval);
+int Wait(char* name);
+int Signal(char* name);
+
 #endif /* IN_ASM */
 
 #endif /* SYSCALL_H */

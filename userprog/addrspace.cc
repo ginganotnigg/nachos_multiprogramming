@@ -19,7 +19,9 @@
 #include "main.h"
 #include "addrspace.h"
 #include "machine.h"
+#include "noff.h"
 #include "synch.h"
+
 
 //----------------------------------------------------------------------
 // SwapHeader
@@ -28,7 +30,8 @@
 //	endian machine, and we're now running on a big endian machine.
 //----------------------------------------------------------------------
 
-static void SwapHeader (NoffHeader *noffH)
+static void 
+SwapHeader (NoffHeader *noffH)
 {
     noffH->noffMagic = WordToHost(noffH->noffMagic);
     noffH->code.size = WordToHost(noffH->code.size);
@@ -66,51 +69,26 @@ static void SwapHeader (NoffHeader *noffH)
 
 AddrSpace::AddrSpace()
 {
-    /*pageTable = new TranslationEntry[NumPhysPages];
-    for (int i = 0; i < NumPhysPages; i++) {
-	pageTable[i].virtualPage = i;	// for now, virt page # = phys page #
-	pageTable[i].physicalPage = i;
-	pageTable[i].valid = TRUE;
-	pageTable[i].use = FALSE;
-	pageTable[i].dirty = FALSE;
-	pageTable[i].readOnly = FALSE;  
-    }
+    // pageTable = new TranslationEntry[NumPhysPages];
+    // for (int i = 0; i < NumPhysPages; i++) {
+	// pageTable[i].virtualPage = i;	// for now, virt page # = phys page #
+	// pageTable[i].physicalPage = physMemory.FindAndSet();
+	// pageTable[i].valid = TRUE;
+	// pageTable[i].use = FALSE;
+	// pageTable[i].dirty = FALSE;
+	// pageTable[i].readOnly = FALSE;  
+    // }
     
     // zero out the entire address space
-    bzero(kernel->machine->mainMemory, MemorySize);*/
+    //bzero(kernel->machine->mainMemory, MemorySize);
 }
 
-void AddrSpace::CreatePageTable(OpenFile*& exec, NoffHeader& noffH, unsigned int& size) {
-    pageTable = new TranslationEntry[numPages];
-    for (int i = 0; i < numPages; i++) {
-        pageTable[i].virtualPage = i;	// for now, virt page # = phys page #
-        pageTable[i].physicalPage = kernel->gPhysPageBitMap->FindAndSet();
-        pageTable[i].valid = TRUE;
-        pageTable[i].use = FALSE;
-        pageTable[i].dirty = FALSE;
-        pageTable[i].readOnly = FALSE; 
-        bzero(&(kernel->machine->mainMemory[pageTable[i].physicalPage * PageSize]), PageSize);
-        DEBUG(dbgAddr, "phyPage " << pageTable[i].physicalPage); 
-    }
- 
-    if (noffH.code.size > 0) {
-        for(int i = 0; i < numPages ; i++) {
-            exec->ReadAt(
-                &(kernel->machine->mainMemory[noffH.code.virtualAddr + (pageTable[i].physicalPage * PageSize)]), PageSize,
-                noffH.code.inFileAddr + (i * PageSize));
-        }
-    }
-    if (noffH.initData.size > 0) {
-        for(int i = 0 ; i < numPages ; i++) {
-            exec->ReadAt(
-                &(kernel->machine->mainMemory[noffH.initData.virtualAddr + (pageTable[i]. physicalPage * PageSize)]), PageSize,
-                noffH.initData.inFileAddr + (i * PageSize));
-        }
-    } 
-}
+//----------------------------------------------------------------------
+// AddrSpace::~AddrSpace
+// 	Dealloate an address space.
+//----------------------------------------------------------------------
 
-AddrSpace::AddrSpace(char *fileName) 
-{
+AddrSpace::AddrSpace(char *fileName) {
     OpenFile *executable = kernel->fileSystem->Open(fileName);
     NoffHeader noffH;
     unsigned int size;
@@ -126,16 +104,17 @@ AddrSpace::AddrSpace(char *fileName)
     ASSERT(noffH.noffMagic == NOFFMAGIC);
     
     kernel->addrLock->P();
-    size = noffH.code.size + noffH.initData.size + noffH.uninitData.size + UserStackSize;	
-    // we need to increase the size to leave room for the stack
+    size = noffH.code.size + noffH.initData.size + noffH.uninitData.size 
+			+ UserStackSize;	// we need to increase the size
+						// to leave room for the stack
 
     numPages = divRoundUp(size, PageSize);
     size = numPages * PageSize;
     //-----------------------------
-    ASSERT(numPages <= NumPhysPages);   // check we're not trying
-                                        // to run anything too big --
-                                        // at least until we have
-                                        // virtual memory
+    ASSERT(numPages <= NumPhysPages);		// check we're not trying
+						// to run anything too big --
+						// at least until we have
+						// virtual memory
 
     if (numPages > kernel->gPhysPageBitMap->NumClear()) {
         DEBUG(dbgAddr, "Not enough free space");
@@ -143,29 +122,50 @@ AddrSpace::AddrSpace(char *fileName)
         delete executable;
         kernel->addrLock->V();
         return;
+        //return FALSE;
     }
     
     DEBUG(dbgAddr, "Initializing address space: " << numPages << ", " << size);
 
-    // Update after this line
-    CreatePageTable(executable, noffH, size);
-
+    //thay đổi từ đây
+    pageTable = new TranslationEntry[numPages];
+    for (int i = 0; i < numPages; i++) {
+        pageTable[i].virtualPage = i;	// for now, virt page # = phys page #
+        pageTable[i].physicalPage = kernel->gPhysPageBitMap->FindAndSet();
+        //cerr << i << " " << pageTable[i].physicalPage;
+        pageTable[i].valid = TRUE;
+        pageTable[i].use = FALSE;
+        pageTable[i].dirty = FALSE;
+        pageTable[i].readOnly = FALSE; 
+        bzero(&(kernel->machine->mainMemory[pageTable[i].physicalPage * PageSize]),PageSize);
+        DEBUG(dbgAddr, "phyPage " << pageTable[i].physicalPage); 
+    }
+ 
+    if (noffH.code.size > 0)
+    {
+        for(int i = 0; i < numPages ; i++)
+            executable->ReadAt(&(kernel->machine->mainMemory[noffH.code.virtualAddr + (pageTable[i].physicalPage*PageSize)]) 
+            ,PageSize,noffH.code.inFileAddr+(i*PageSize));
+    }
+    if (noffH.initData.size > 0)
+    {
+        for(int i = 0 ; i < numPages ; i++)
+            executable->ReadAt(&(kernel->machine->mainMemory[noffH.initData.virtualAddr+(pageTable[i].physicalPage*PageSize)]) 
+            ,PageSize,noffH.initData.inFileAddr+(i*PageSize));
+    } 
     kernel->addrLock->V();
     delete executable;			// close file
 }
 
-//----------------------------------------------------------------------
-// AddrSpace::~AddrSpace
-// 	Dealloate an address space.
-//----------------------------------------------------------------------
-
 AddrSpace::~AddrSpace()
 {
-    for (int i = 0; i < numPages; i++) {
+    int i;
+    for (i = 0; i < numPages; i++) {
         kernel->gPhysPageBitMap->Clear(pageTable[i].physicalPage);
     }
-    delete[] pageTable;
+    delete []pageTable;
 }
+
 
 //----------------------------------------------------------------------
 // AddrSpace::Load
@@ -177,7 +177,8 @@ AddrSpace::~AddrSpace()
 //	"fileName" is the file containing the object code to load into memory
 //----------------------------------------------------------------------
 
-bool AddrSpace::Load(char *fileName) 
+bool 
+AddrSpace::Load(char *fileName) 
 {
     OpenFile *executable = kernel->fileSystem->Open(fileName);
     NoffHeader noffH;
@@ -193,7 +194,7 @@ bool AddrSpace::Load(char *fileName)
 		(WordToHost(noffH.noffMagic) == NOFFMAGIC))
     	SwapHeader(&noffH);
     ASSERT(noffH.noffMagic == NOFFMAGIC);
-
+    kernel->addrLock->P();
 #ifdef RDATA
 // how big is address space?
     size = noffH.code.size + noffH.readonlyData.size + noffH.initData.size +
@@ -208,28 +209,56 @@ bool AddrSpace::Load(char *fileName)
 #endif
     numPages = divRoundUp(size, PageSize);
     size = numPages * PageSize;
-
+    //-----------------------------
     ASSERT(numPages <= NumPhysPages);		// check we're not trying
 						// to run anything too big --
 						// at least until we have
 						// virtual memory
 
+    if (numPages > kernel->gPhysPageBitMap->NumClear()) {
+        DEBUG(dbgAddr, "Not enough free space");
+        numPages = 0;
+        delete executable;
+        kernel->addrLock->V();
+        return FALSE;
+    }
+
     DEBUG(dbgAddr, "Initializing address space: " << numPages << ", " << size);
 
-// then, copy in the code and data segments into memory
-// Note: this code assumes that virtual address = physical address
+    //thay đổi từ đây
+    pageTable = new TranslationEntry[numPages];
+    for (int i = 0; i < numPages; i++) {
+        pageTable[i].virtualPage = i;	// for now, virt page # = phys page #
+        pageTable[i].physicalPage = kernel->gPhysPageBitMap->FindAndSet();
+        pageTable[i].valid = TRUE;
+        pageTable[i].use = FALSE;
+        pageTable[i].dirty = FALSE;
+        pageTable[i].readOnly = FALSE; 
+        bzero(&(kernel->machine->mainMemory[pageTable[i].physicalPage * PageSize])
+        ,PageSize);
+        DEBUG(dbgAddr, "phyPage " << pageTable[i].physicalPage); 
+    }
+    if (noffH.code.size > 0)
+    {
+        for(int i = 0; i < numPages ; i++)
+            executable->ReadAt(&(kernel->machine->mainMemory[noffH.code.virtualAddr]) 
+            + (pageTable[i].physicalPage*PageSize),PageSize,noffH.code.inFileAddr+(i*PageSize));
+    }
     
-    // Change after this line
-    CreatePageTable(executable, noffH, size);
+    if (noffH.initData.size > 0)
+    {
+        for(int i = 0 ; i < numPages ; i++)
+            executable->ReadAt(&(kernel->machine->mainMemory[noffH.initData.virtualAddr]) 
+            + (pageTable[i].physicalPage*PageSize),PageSize,noffH.initData.inFileAddr+(i*PageSize));
+    } 
 
 #ifdef RDATA
     if (noffH.readonlyData.size > 0) {
         DEBUG(dbgAddr, "Initializing read only data segment.");
-	    DEBUG(dbgAddr, noffH.readonlyData.virtualAddr << ", " << noffH.readonlyData.size);
+	DEBUG(dbgAddr, noffH.readonlyData.virtualAddr << ", " << noffH.readonlyData.size);
         executable->ReadAt(
-		    &(kernel->machine->mainMemory[noffH.readonlyData.virtualAddr]),
-			noffH.readonlyData.size, 
-            noffH.readonlyData.inFileAddr);
+		&(kernel->machine->mainMemory[noffH.readonlyData.virtualAddr]),
+			noffH.readonlyData.size, noffH.readonlyData.inFileAddr);
     }
 #endif
     kernel->addrLock->V();
@@ -246,7 +275,8 @@ bool AddrSpace::Load(char *fileName)
 //
 //----------------------------------------------------------------------
 
-void AddrSpace::Execute() 
+void 
+AddrSpace::Execute() 
 {
 
     kernel->currentThread->space = this;
@@ -272,7 +302,8 @@ void AddrSpace::Execute()
 //	when this thread is context switched out.
 //----------------------------------------------------------------------
 
-void AddrSpace::InitRegisters()
+void
+AddrSpace::InitRegisters()
 {
     Machine *machine = kernel->machine;
     int i;
@@ -331,8 +362,8 @@ void AddrSpace::RestoreState()
 //  for read-write access.
 //  Return any exceptions caused by the address translation.
 //----------------------------------------------------------------------
-
-ExceptionType AddrSpace::Translate(unsigned int vaddr, unsigned int *paddr, int isReadWrite)
+ExceptionType
+AddrSpace::Translate(unsigned int vaddr, unsigned int *paddr, int isReadWrite)
 {
     TranslationEntry *pte;
     int               pfn;
@@ -372,4 +403,6 @@ ExceptionType AddrSpace::Translate(unsigned int vaddr, unsigned int *paddr, int 
 
     return NoException;
 }
+
+
 

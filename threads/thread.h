@@ -82,19 +82,12 @@ class Thread {
     void *machineState[MachineStateSize];  // all registers except for stackTop
 
   public:
-    // Change 4 lines below
-    int processID;
-    void FreeSpace() {
-        if (space != 0) delete space;
-        space = NULL;
-    }
-
     Thread(char* debugName);		// initialize a Thread 
     ~Thread(); 				// deallocate a Thread
 					// NOTE -- thread being deleted
 					// must not be running when delete 
 					// is called
-    
+    int processID;
     // basic thread operations
 
     void Fork(VoidFunctionPtr func, void *arg); 
@@ -111,7 +104,10 @@ class Thread {
     char* getName() { return (name); }
     void Print() { cout << name; }
     void SelfTest();		// test whether thread impl is working
-
+    void FreeSpace() {
+        if (space != 0) delete space;
+        space = NULL;
+    }
   private:
     // some of the private data for this class is listed above
     

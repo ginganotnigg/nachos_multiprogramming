@@ -15,13 +15,12 @@
 
 #include "copyright.h"
 #include "filesys.h"
-#include "noff.h"
 
 #define UserStackSize		1024 	// increase this as necessary!
 
 class AddrSpace {
   public:
-    AddrSpace(char *fileName);  // Change in this line
+    AddrSpace(char *fileName); 
     AddrSpace();			// Create an address space.
     ~AddrSpace();			// De-allocate an address space
 
@@ -34,10 +33,7 @@ class AddrSpace {
                                         // been loaded
 
     void SaveState();			// Save/restore address space-specific
-    void RestoreState();		// info on a context switch
-    
-    // Change in this line
-    void CreatePageTable(OpenFile*& exec, NoffHeader& noffH, unsigned int& size);
+    void RestoreState();		// info on a context switch 
 
     // Translate virtual address _vaddr_
     // to physical address _paddr_. _mode_

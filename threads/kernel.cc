@@ -91,7 +91,7 @@ Kernel::Initialize()
     // But if it ever tries to give up the CPU, we better have a Thread
     // object to save its state. 
     currentThread = new Thread("main");	
-    currentThread->processID = 0;	
+    currentThread->processID = 0; // main	
     currentThread->setStatus(RUNNING);
 
     stats = new Statistics();		// collect statistics
@@ -101,7 +101,7 @@ Kernel::Initialize()
     machine = new Machine(debugUserProg);
     synchConsoleIn = new SynchConsoleInput(consoleIn); // input from stdin
     synchConsoleOut = new SynchConsoleOutput(consoleOut); // output to stdout
-    synchDisk = new SynchDisk();
+    synchDisk = new SynchDisk();    //
 #ifdef FILESYS_STUB
     fileSystem = new FileSystem();
 #else
@@ -109,7 +109,7 @@ Kernel::Initialize()
 #endif // FILESYS_STUB
     postOfficeIn = new PostOfficeInput(10);
     postOfficeOut = new PostOfficeOutput(reliability);
-    // Change after this line
+
     addrLock = new Semaphore("addrLock", 1);
     gPhysPageBitMap = new Bitmap(512);
     semTab = new STable();
@@ -138,9 +138,10 @@ Kernel::~Kernel()
     delete postOfficeOut;
 
     delete gPhysPageBitMap;
-    delete pTab;
     delete semTab;
     delete addrLock;
+    delete pTab;
+    
     Exit(0);
 }
 

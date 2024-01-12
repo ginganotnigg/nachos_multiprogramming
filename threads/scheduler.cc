@@ -77,7 +77,7 @@ Scheduler::FindNextToRun ()
     ASSERT(kernel->interrupt->getLevel() == IntOff);
 
     if (readyList->IsEmpty()) {
-	    return NULL;
+	return NULL;
     } else {
     	return readyList->RemoveFront();
     }
@@ -114,7 +114,7 @@ Scheduler::Run (Thread *nextThread, bool finishing)
     
     if (oldThread->space != NULL) {	// if this thread is a user program,
         oldThread->SaveUserState(); 	// save the user's CPU registers
-	    oldThread->space->SaveState();
+	oldThread->space->SaveState();
     }
     
     oldThread->CheckOverflow();		    // check if the old thread
@@ -145,7 +145,7 @@ Scheduler::Run (Thread *nextThread, bool finishing)
     
     if (oldThread->space != NULL) {	    // if there is an address space
         oldThread->RestoreUserState();     // to restore, do it.
-	    oldThread->space->RestoreState();
+	oldThread->space->RestoreState();
     }
 }
 
@@ -162,7 +162,7 @@ Scheduler::CheckToBeDestroyed()
 {
     if (toBeDestroyed != NULL) {
         delete toBeDestroyed;
-	    toBeDestroyed = NULL;
+	toBeDestroyed = NULL;
     }
 }
  
